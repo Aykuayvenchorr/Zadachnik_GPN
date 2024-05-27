@@ -3,8 +3,13 @@ from django.db.models import CASCADE, SET_NULL
 from month.models import MonthField
 from phonenumber_field.modelfields import PhoneNumberField
 
+from changelog.mixins import ChangeloggableMixin
+from django.db.models.signals import post_delete, post_save
 
-class Company(models.Model):
+from changelog.signals import journal_save_handler, journal_delete_handler
+
+
+class Company(ChangeloggableMixin, models.Model):
     parent = models.ForeignKey('Company', on_delete=CASCADE)
     name = models.CharField(max_length=77, verbose_name='Наименование компании')
     name_full = models.CharField(max_length=255, verbose_name='Полное наименование')
@@ -21,7 +26,7 @@ class Company(models.Model):
         verbose_name_plural = 'Компании'
 
 
-class Subdivision(models.Model):
+class Subdivision(ChangeloggableMixin, models.Model):
     parent = models.ForeignKey('Subdivision', on_delete=CASCADE)
     company = models.ForeignKey('Company', on_delete=CASCADE, verbose_name='Компания')
     name = models.CharField(max_length=77, verbose_name='Наименование подразделения')
@@ -39,7 +44,7 @@ class Subdivision(models.Model):
         verbose_name_plural = 'Подразделения'
 
 
-class Project(models.Model):
+class Project(ChangeloggableMixin, models.Model):
     title = models.CharField(max_length=50)
 
     def __str__(self):
@@ -50,7 +55,7 @@ class Project(models.Model):
         verbose_name_plural = 'Проекты'
 
 
-class LicArea(models.Model):
+class LicArea(ChangeloggableMixin, models.Model):
     title = models.CharField(max_length=50)
     project = models.ManyToManyField(Project)
 
@@ -62,7 +67,7 @@ class LicArea(models.Model):
         verbose_name_plural = 'Лицензионные участки'
 
 
-class Deposit(models.Model):
+class Deposit(ChangeloggableMixin, models.Model):
     title = models.CharField(max_length=50)
     lic_area = models.ManyToManyField(LicArea)
 
@@ -74,7 +79,7 @@ class Deposit(models.Model):
         verbose_name_plural = 'Месторождения'
 
 
-class Object(models.Model):
+class Object(ChangeloggableMixin, models.Model):
     title = models.CharField(max_length=50)
     parent = models.ForeignKey('Object', on_delete=CASCADE)
 
@@ -86,7 +91,7 @@ class Object(models.Model):
         verbose_name_plural = 'Объекты'
 
 
-class NDFL(models.Model):
+class NDFL(ChangeloggableMixin, models.Model):
     rate = models.FloatField()
 
     class Meta:
@@ -94,7 +99,7 @@ class NDFL(models.Model):
         verbose_name_plural = 'НДФЛ'
 
 
-class NDS(models.Model):
+class NDS(ChangeloggableMixin, models.Model):
     rate = models.FloatField()
 
     class Meta:
@@ -102,7 +107,7 @@ class NDS(models.Model):
         verbose_name_plural = 'НДС'
 
 
-class PayTerm(models.Model):
+class PayTerm(ChangeloggableMixin, models.Model):
     condition = models.TextField()
 
     class Meta:
@@ -110,7 +115,7 @@ class PayTerm(models.Model):
         verbose_name_plural = 'Условия платежа'
 
 
-class ContractLease(models.Model):
+class ContractLease(ChangeloggableMixin, models.Model):
     number = models.CharField(max_length=70, verbose_name='Номер договора')
     counter_party = models.ForeignKey('CounterParty', blank=True, null=True, on_delete=SET_NULL, verbose_name='Контрагент')
     date_begin = models.DateField(verbose_name='Дата начала договора')
@@ -132,7 +137,7 @@ class ContractLease(models.Model):
         verbose_name_plural = 'Договоры аренды/субаренды'
 
 
-class CounterParty(models.Model):
+class CounterParty(ChangeloggableMixin, models.Model):
     name = models.CharField(max_length=70)
     esk = models.CharField(max_length=10)
     inn = models.CharField(max_length=20)
@@ -148,7 +153,7 @@ class CounterParty(models.Model):
         verbose_name_plural = 'Контрагенты'
 
 
-class EBK(models.Model):
+class EBK(ChangeloggableMixin, models.Model):
     number = models.CharField(max_length=20)
     article = models.CharField(max_length=100)
 
@@ -157,7 +162,7 @@ class EBK(models.Model):
         verbose_name_plural = 'ЕБК'
 
 
-class RentPayment(models.Model):
+class RentPayment(ChangeloggableMixin, models.Model):
     """Платеж по аренде (Задание на платеж - ZADANL_V3)"""
 
     contract = models.ForeignKey(ContractLease, blank=True, null=True, on_delete=SET_NULL)  # Скорее всего on_delete нужно будет изменить
@@ -174,6 +179,45 @@ class RentPayment(models.Model):
         verbose_name = 'Платеж по аренде'
         verbose_name_plural = 'Платежи по аренде'
 
+
+post_save.connect(journal_save_handler, sender=CounterParty)
+post_delete.connect(journal_delete_handler, sender=CounterParty)
+
+post_save.connect(journal_save_handler, sender=RentPayment)
+post_delete.connect(journal_delete_handler, sender=RentPayment)
+
+post_save.connect(journal_save_handler, sender=EBK)
+post_delete.connect(journal_delete_handler, sender=EBK)
+
+post_save.connect(journal_save_handler, sender=ContractLease)
+post_delete.connect(journal_delete_handler, sender=ContractLease)
+
+post_save.connect(journal_save_handler, sender=PayTerm)
+post_delete.connect(journal_delete_handler, sender=PayTerm)
+
+post_save.connect(journal_save_handler, sender=NDS)
+post_delete.connect(journal_delete_handler, sender=NDS)
+
+post_save.connect(journal_save_handler, sender=NDFL)
+post_delete.connect(journal_delete_handler, sender=NDFL)
+
+post_save.connect(journal_save_handler, sender=Object)
+post_delete.connect(journal_delete_handler, sender=Object)
+
+post_save.connect(journal_save_handler, sender=Deposit)
+post_delete.connect(journal_delete_handler, sender=Deposit)
+
+post_save.connect(journal_save_handler, sender=LicArea)
+post_delete.connect(journal_delete_handler, sender=LicArea)
+
+post_save.connect(journal_save_handler, sender=Project)
+post_delete.connect(journal_delete_handler, sender=Project)
+
+post_save.connect(journal_save_handler, sender=Subdivision)
+post_delete.connect(journal_delete_handler, sender=Subdivision)
+
+post_save.connect(journal_save_handler, sender=Company)
+post_delete.connect(journal_delete_handler, sender=Company)
 
 
 
